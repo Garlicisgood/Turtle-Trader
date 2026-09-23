@@ -36,7 +36,7 @@ these caused silent failures during testing and took real debugging to track dow
 | Index | Russell 2000 (Micro) | M2K | CME | - | |
 | Index | Dow (Micro) | MYM | CBOT | - | |
 | Metal | Gold (Micro) | MGC | COMEX | - | |
-| Metal | Silver (Micro) | **SI** | COMEX | **SIL** | ⚠️ IBKR lists Micro Silver under root symbol "SI" (same as full-size), distinguished by tradingClass "SIL" - NOT under symbol "SIL" directly |
+| Metal | Silver (Micro) | **SI** | COMEX | **SIL** | ⚠️ IBKR lists Micro Silver under root symbol "SI" (same as full-size), distinguished by tradingClass "SIL" - NOT under symbol "SIL" directly. Also, the continuous contract (ContFuture) IGNORES tradingClass and returns full-size SI (5000 oz), so the trader uses the dated SIL contract instead |
 | Metal | Copper (Micro) | MHG | COMEX | - | |
 | Energy | Crude Oil (Micro) | MCL | NYMEX | - | |
 | Energy | Natural Gas (Micro) | **MHNG** | NYMEX | - | ⚠️ CME's Globex code is "MNG" but IBKR's internal symbol is "MHNG" (spelled out) - using "MNG" returns "no security definition found" |
@@ -88,10 +88,19 @@ IBKR for the order flow).
   market where IBKR's position disagrees with saved state, and blocks a market whose
   IBKR multiplier disagrees with the config's point value.
 
+- **Paper sizing:** the paper account holds $1M, so `PAPER_STARTING_EQUITY = 25000` makes
+  the trader size as a $25k account plus the actual P&L since the first run.
+
+## First dry run against TWS (2026-09-23)
+- All 14 markets loaded. The point values for 13 markets matched IBKR, including the
+  micro grains, which are quoted in cents.
+- The Micro Silver full-size bug was caught by the point-value check and has been fixed.
+- Sizing at $25k (1% = $250, 2N stop): only MZC (2 contracts), MZW, MZS, MZM, MZL and
+  MHNG (1 each) can be traded. MES/MNQ/M2K/MYM/MGC/MHG/MCL/SIL all risk more than
+  $250 per contract.
+
 ## Next Steps
-1. First `--dry-run` against TWS. Confirm no point-value mismatches (the micro grains'
-   quote units weren't verified: expected $5/cent for MZC/MZW/MZS, $10 per $1 for MZM,
-   $60/cent for MZL) and that the contract resolution works for all 14 markets.
+1. Re-run `--dry-run` to confirm the silver fix and the $25k sizing.
 2. Run `turtle_backtest.py --download` and review the results, especially how many
    signals are skipped because they're too small to size at the actual account size.
 3. **Contract rolls are not automated.** The trader warns "ROLL NEEDED" 10 days

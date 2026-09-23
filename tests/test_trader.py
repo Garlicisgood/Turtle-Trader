@@ -176,3 +176,43 @@ def test_reconcile_replaces_missing_stop():
     [stop] = ib.stops()
     assert stop.order.totalQuantity == 3
     assert state['positions']['MZC'].stop_perm_id == stop.order.permId
+
+
+def test_micro_silver_not_resolved_to_full_size(monkeypatch):
+    """IBKR's continuous SI contract is full-size silver even when asked for tradingClass SIL."""
+    import datetime as dt
+    from ib_async import ContractDetails
+
+    full = ContractDetails(contract=Contract(conId=1, symbol='SI', tradingClass='SI', multiplier='5000'),
+                           minTick=0.005, priceMagnifier=1)
+    micro = ContractDetails(contract=Contract(conId=2, symbol='SI', tradingClass='SIL', multiplier='1000',
+                                              lastTradeDateOrContractMonth='20261229'),
+                            minTick=0.005, priceMagnifier=1)
+    day0 = dt.date(2025, 1, 1)
+    bar_list = [types.SimpleNamespace(date=day0 + dt.timedelta(days=i), open=30, high=31, low=29, close=30)
+                for i in range(200)]
+
+    class StubIB:
+        def qualifyContracts(self, c):
+            return [Contract(conId=1, symbol='SI', tradingClass='SI')]
+        def reqContractDetails(self, c):
+            return [full] if c.conId == 1 else [micro]
+        def reqHistoricalData(self, c, **kw):
+            self.history_con_id = c.conId
+            return bar_list
+
+    ib = StubIB()
+    md = tt.load_market(ib, cfg.MARKETS_BY_KEY['SIL'])
+    assert md.contract.conId == 2 and md.point_value == 1000.0
+    assert ib.history_con_id == 2
+    assert tt.check_point_value(md)
+
+
+def test_paper_sizing_equity_tracks_pnl(monkeypatch):
+    monkeypatch.setattr(cfg, 'PAPER_STARTING_EQUITY', 25000)
+    state = empty_state()
+    assert tt.sizing_equity(state, 1_000_000, is_paper=True) == 25000       # first run sets baseline
+    assert tt.sizing_equity(state, 1_001_500, is_paper=True) == 26500       # +$1,500 P&L
+    assert tt.sizing_equity(state, 1_001_500, is_paper=False) == 1_001_500  # never on a live account
+    monkeypatch.setattr(cfg, 'PAPER_STARTING_EQUITY', None)
+    assert tt.sizing_equity(state, 1_001_500, is_paper=True) == 1_001_500

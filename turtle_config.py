@@ -33,6 +33,11 @@ MAX_UNITS_PER_MARKET = 4
 # 2N stop risks 2%. To get that instead, set SIZING_N = 1.0.)
 SIZING_N = STOP_N
 
+# Paper accounts start at $1,000,000, which sizes nothing like a real $15k-$50k
+# account. When set, the trader sizes paper trades as if the account started at
+# this amount, plus/minus the actual P&L since the first run. Ignored on a live account.
+PAPER_STARTING_EQUITY = 25000   # set to None to size off the real paper balance
+
 # Portfolio heat limits (classic Turtle values), counted in units, not contracts
 MAX_UNITS_PER_GROUP = 6        # closely correlated markets (the "group" column below)
 MAX_UNITS_PER_DIRECTION = 12   # all longs together, or all shorts together

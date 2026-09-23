@@ -120,7 +120,11 @@ def load_market(ib, m):
         history_contract = qualified[0]
         found = ib.reqContractDetails(Contract(conId=history_contract.conId))
         details = found[0] if found else None
-    else:
+        # IBKR's continuous contract ignores tradingClass: asking for Micro Silver
+        # (SI / SIL) returns FULL-SIZE silver (5000 oz). Use the dated contract instead.
+        if details and m.trading_class and details.contract.tradingClass != m.trading_class:
+            details = None
+    if details is None:
         details = get_front_month_details(ib, m)
         history_contract = details.contract if details else None
     if details is None:
@@ -381,6 +385,18 @@ def get_equity(ib):
     raise RuntimeError("NetLiquidation not found in account summary")
 
 
+def sizing_equity(state, net_liq, is_paper):
+    """
+    Equity used for position sizing. On paper with PAPER_STARTING_EQUITY set, it's
+    that amount plus the account's P&L since the first run (the first run's
+    balance is remembered in the state file).
+    """
+    if not is_paper or cfg.PAPER_STARTING_EQUITY is None:
+        return net_liq
+    baseline = state.setdefault('paper_baseline_net_liq', net_liq)
+    return cfg.PAPER_STARTING_EQUITY + (net_liq - baseline)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Daily Turtle trading run")
     parser.add_argument('--dry-run', action='store_true', help="show decisions, place no orders, save nothing")
@@ -400,13 +416,18 @@ def main():
 
     try:
         accounts = ib.managedAccounts()
-        if not args.live_account and not all(a.startswith('D') for a in accounts):
+        is_paper = all(a.startswith('D') for a in accounts)
+        if not args.live_account and not is_paper:
             log.error(f"Account {accounts} does not look like a paper account (paper IDs start with 'D'). "
                       f"Pass --live-account if you really mean to trade it.")
             sys.exit(1)
 
         state = load_state(cfg.STATE_FILE)
-        equity = get_equity(ib)
+        net_liq = get_equity(ib)
+        equity = sizing_equity(state, net_liq, is_paper)
+        if equity != net_liq:
+            log.info(f"Paper account balance ${net_liq:,.0f} - sizing as a ${equity:,.0f} account "
+                     f"(PAPER_STARTING_EQUITY in turtle_config.py)")
         ib.reqAllOpenOrders()
 
         log.info("\nLoading market data...")
