@@ -129,6 +129,22 @@ IBKR for the order flow).
 4. Schedule it (Windows Task Scheduler, Sun-Thu ~8:30-10pm ET) and paper trade.
 5. Extended paper trading before moving to the funded account.
 
+## Second Strategy: 15-Minute Opening Range Breakout (started 2026-09-23)
+`orb_backtest.py` is a backtest only. Nothing trades live yet.
+- Markets: MES, MNQ, MYM (user's choice). Risk 1% of equity per trade (user's choice).
+- Anchor = 2nd 15-min RTH candle (9:45-10:00 ET). Buy stop 1 tick above the anchor high, sell
+  stop 1 tick below its low. Initial stop = the other side of the anchor. One trade per market per day.
+- Two entry windows compared (user asked for both): 3rd candle only / any candle until noon.
+- Five exits compared: hold to close, 1R/2R/3R target, 1R trailing stop. Always flat by 4pm.
+- 15-min bars can't show order of events, so the worst case is always assumed (stop wins
+  ties with the target; a candle breaking both sides = full loss).
+- Data: stitched from each quarterly contract while front month (roll 8 days before
+  expiry). No back-adjustment is needed for day trades. IBKR keeps ~2 years of expired data.
+- The three index micros are highly correlated, so the report shows how often they
+  traded the same direction the same day (real risk ~3x one trade).
+- Next: user runs `--download`, then the comparison; pick a rule; build a live ORB trader
+  (separate client ID) if the results hold up.
+
 ## Important Context
 - Account size: target $75k (paper sizes as $75k; the funded account will match)
 - User has some coding experience (self-described as "not very experienced but

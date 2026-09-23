@@ -14,6 +14,7 @@ Interactive Brokers. Full rules and background: [turtle_system_handoff.md](turtl
 | `turtle_backtest.py` | Replays history through the same rules |
 | `turtle_signals.py` | The original signal scanner (read-only, still works on its own) |
 | `test_connection.py` | Checks the TWS connection |
+| `orb_backtest.py` | **Second strategy:** 15-minute opening range breakout backtest (MES/MNQ/MYM) |
 | `tests/` | Automated tests, no TWS needed: `python -m pytest` |
 
 ## Setup (Windows Command Prompt)
@@ -83,3 +84,17 @@ table shows the size for every market, and the backtest counts the skipped signa
 The settings that change this are in `turtle_config.py`: `RISK_PER_UNIT`, and `SIZING_N`
 (set it to `1.0` for the original Turtles' sizing, where 1% of equity = a 1N move,
 so each unit is about twice as large and risks about 2% to the stop).
+
+## Second strategy: 15-minute opening range breakout
+
+Separate from the Turtle system. The 2nd 15-minute candle (9:45-10:00 ET) is the anchor;
+a break above its high is a buy and a break below its low is a short, with the stop on the other side of the anchor.
+It risks 1% per trade on MES, MNQ and MYM, and is always flat by the close. The backtest compares two entry
+windows (3rd candle only, or until noon) against five exits (hold to close, 1R/2R/3R targets,
+and a 1R trailing stop).
+
+```
+python orb_backtest.py --download     # ~20 min: IBKR limits how fast history can be requested
+python orb_backtest.py
+```
+Settings are at the top of `orb_backtest.py`.

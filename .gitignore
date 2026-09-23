@@ -7,3 +7,5 @@ turtle_state.json.*
 logs/
 data/
 backtest_results/
+data_15m/
+orb_results/
