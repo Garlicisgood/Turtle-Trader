@@ -88,8 +88,10 @@ IBKR for the order flow).
   market where IBKR's position disagrees with saved state, and blocks a market whose
   IBKR multiplier disagrees with the config's point value.
 
-- **Paper sizing:** the paper account holds $1M, so `PAPER_STARTING_EQUITY = 25000` makes
-  the trader size as a $25k account plus the actual P&L since the first run.
+- **Paper sizing:** the paper account holds $1M, so `PAPER_STARTING_EQUITY = 75000` makes
+  the trader size as a $75k account plus the actual P&L since the first run.
+- **Account size target: $75k** (chosen 2026-09-23). At today's N that trades 11 markets
+  (everything except MGC, MNQ and SIL, which need roughly $160k+ for 1 contract).
 
 ## First dry run against TWS (2026-09-23)
 - All 14 markets loaded. The point values for 13 markets matched IBKR, including the
@@ -111,7 +113,7 @@ IBKR for the order flow).
 5. Extended paper trading before moving to the funded account.
 
 ## Important Context
-- Account size: $15k-$50k paper trading (funded account will match this range)
+- Account size: target $75k (paper sizes as $75k; the funded account will match)
 - User has some coding experience (self-described as "not very experienced but
   knowledgeable") - prefers things explained clearly, has been running commands
   via Windows Command Prompt

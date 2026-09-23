@@ -29,7 +29,7 @@ python -m pytest
 1. **Download history and backtest** (TWS open):
    ```
    python turtle_backtest.py --download --years 15
-   python turtle_backtest.py --equity 25000
+   python turtle_backtest.py --equity 75000
    ```
    Pay attention to the "too small to size" line. See *Account size* below.
 

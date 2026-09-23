@@ -20,8 +20,8 @@ Usage:
     # 1. download history once from TWS (saved to data/<KEY>.csv)
     python turtle_backtest.py --download --years 15
     # 2. run the backtest from the saved files (TWS not needed)
-    python turtle_backtest.py --equity 25000
-    python turtle_backtest.py --equity 25000 --start 2015-01-01 --end 2024-12-31
+    python turtle_backtest.py --equity 75000
+    python turtle_backtest.py --equity 75000 --start 2015-01-01 --end 2024-12-31
 
 Any CSV with date,open,high,low,close columns works too - put it in data/<KEY>.csv.
 """
@@ -235,7 +235,8 @@ def main():
     parser = argparse.ArgumentParser(description="Turtle portfolio backtest")
     parser.add_argument('--download', action='store_true', help="pull history from TWS into data/")
     parser.add_argument('--years', type=int, default=15, help="years of history to download")
-    parser.add_argument('--equity', type=float, default=25000, help="starting account equity")
+    parser.add_argument('--equity', type=float, default=cfg.PAPER_STARTING_EQUITY or 75000,
+                        help="starting account equity (default: PAPER_STARTING_EQUITY)")
     parser.add_argument('--start', type=pd.Timestamp, help="first date to trade (YYYY-MM-DD)")
     parser.add_argument('--end', type=pd.Timestamp, help="last date to trade (YYYY-MM-DD)")
     parser.add_argument('--markets', help="comma-separated keys to include, e.g. MES,MGC (default: all)")
