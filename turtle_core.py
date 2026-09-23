@@ -19,6 +19,28 @@ import turtle_config as cfg
 # Indicators
 # ---------------------------------------------------------------------------
 
+def flat_bars(df):
+    """
+    Bars whose open, high, low and close are all the same price. IBKR's older
+    continuous-futures history is full of these (a closing price only, no real
+    range). They make N far too small - which makes positions too big and stops
+    too tight - so neither the trader nor the backtest may use them.
+    """
+    return df['high'] == df['low']
+
+
+def trim_flat_history(df, window=20, max_flat=0.25):
+    """
+    Drops everything up to the last 20-bar stretch that is more than 25% flat bars.
+    Returns (trimmed_df, date_of_last_bad_bar or None).
+    """
+    bad = flat_bars(df).astype(float).rolling(window, min_periods=1).mean() > max_flat
+    if not bad.any():
+        return df, None
+    last_bad = bad[bad].index[-1]
+    return df.loc[last_bad + 1:].reset_index(drop=True), df['date'][last_bad]
+
+
 def calculate_true_range(df):
     """True Range = the largest of: high-low, abs(high-prev_close), abs(low-prev_close)"""
     prev_close = df['close'].shift(1)

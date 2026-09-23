@@ -101,6 +101,23 @@ IBKR for the order flow).
   MHNG (1 each) can be traded. MES/MNQ/M2K/MYM/MGC/MHG/MCL/SIL all risk more than
   $250 per contract.
 
+## Backtest findings (2026-09-23)
+- **IBKR's continuous-futures daily history can't be used for backtesting before ~2023-2025.**
+  It is back-adjusted for rolls (no roll gaps), but large stretches of older bars have
+  open = high = low = close. That made N 2-6x too small, so positions were far too big and
+  stops far too tight. The first backtest (-83% max drawdown) was invalid because of it.
+  Both programs now reject these bars (`trim_flat_history` / `flat_bars` in turtle_core).
+  Clean history is only ~1-4 years per market (MHNG from 2023-09, MZC from 2022-10,
+  equity indexes only from 2025).
+- On that short clean window (2022-10 to 2026-09, mostly 2024-26) every variant tested lost money:
+  as built -37% (maxDD -49%, 6% winners, 64/68 exits by the 2N stop); no pyramiding -13%;
+  no pyramiding + 3N stop -17% (maxDD -19%); no hard stop (50-day exit only) -18%.
+  The window is far too short to judge a 100-day system, and pyramiding with the stop
+  2N from the newest unit did the most damage.
+- A hand-checked trade (MZL long 2025-04-03) matched the rules exactly.
+- **Needed next:** 15-20+ years of proper back-adjusted daily futures data from a data
+  vendor, loaded as data/<KEY>.csv (date,open,high,low,close).
+
 ## Next Steps
 1. Re-run `--dry-run` to confirm the silver fix and the $25k sizing.
 2. Run `turtle_backtest.py --download` and review the results, especially how many

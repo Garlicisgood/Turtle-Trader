@@ -37,7 +37,7 @@ import pandas as pd
 from ib_async import IB, ContFuture, Contract, MarketOrder, StopOrder
 
 import turtle_config as cfg
-from turtle_core import (Snapshot, add_indicators, plan_actions, open_position,
+from turtle_core import (Snapshot, add_indicators, flat_bars, plan_actions, open_position,
                          add_unit, round_to_tick, unit_size)
 from turtle_state import load_state, save_state, record_closed_trade
 
@@ -138,6 +138,13 @@ def load_market(ib, m):
         return None
     if df is None or len(df) < cfg.ENTRY_LOOKBACK + cfg.N_LOOKBACK:
         log.warning(f"  {m.key}: not enough history ({0 if df is None else len(df)} bars), skipping.")
+        return None
+
+    window = df.iloc[-(cfg.ENTRY_LOOKBACK + cfg.N_LOOKBACK):]
+    n_flat = int(flat_bars(window).sum())
+    if n_flat > 0.05 * len(window):
+        log.error(f"  {m.key}: {n_flat} of the last {len(window)} bars have no real high/low "
+                  f"(bad data from IBKR) - N would be wrong, skipping.")
         return None
 
     # Never trade off a bar that is still forming.

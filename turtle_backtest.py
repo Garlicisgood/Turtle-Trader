@@ -34,7 +34,7 @@ import pandas as pd
 
 import turtle_config as cfg
 from turtle_core import (Snapshot, add_indicators, plan_actions, open_position,
-                         add_unit, stop_hit)
+                         add_unit, stop_hit, trim_flat_history)
 
 DATA_DIR = 'data'
 RESULTS_DIR = 'backtest_results'
@@ -81,6 +81,15 @@ def load_data(keys):
             continue
         df = pd.read_csv(path, parse_dates=['date'])
         df = df.sort_values('date').drop_duplicates('date').reset_index(drop=True)
+        df, bad_until = trim_flat_history(df)
+        if bad_until is not None:
+            print(f"  {key}: bars without a real high/low until {bad_until.date()} - "
+                  f"using {len(df)} bars from {df['date'].iloc[0].date()} on." if len(df) else
+                  f"  {key}: no usable bars, leaving it out.")
+        if len(df) < cfg.ENTRY_LOOKBACK + cfg.N_LOOKBACK:
+            if len(df):
+                print(f"  {key}: only {len(df)} usable bars - not enough, leaving it out.")
+            continue
         frames[key] = add_indicators(df).set_index('date')
     return frames
 

@@ -13,7 +13,7 @@ import turtle_config as cfg
 from turtle_backtest import Backtest
 from turtle_core import (Position, Snapshot, Unit, add_indicators, add_unit, calculate_n,
                          entry_signal, exit_signal, open_position, plan_actions, pyramid_due,
-                         round_to_tick, stop_hit, unit_size)
+                         round_to_tick, stop_hit, trim_flat_history, unit_size)
 from turtle_state import load_state, save_state, record_closed_trade
 
 
@@ -178,3 +178,16 @@ def test_backtest_catches_a_trend():
     assert first['units'] == cfg.MAX_UNITS_PER_MARKET
     assert first['pnl'] > 0
     assert bt.cash > 25_000
+
+
+def test_trim_flat_history_drops_bars_without_range():
+    df = bars(np.linspace(100, 110, 200))
+    for col in ('open', 'high', 'low'):
+        df.loc[:79, col] = df.loc[:79, 'close']       # first 80 bars flat
+        df.loc[150, col] = df.loc[150, 'close']       # one stray flat bar later is fine
+    trimmed, bad_until = trim_flat_history(df)
+    # cut just past the flat stretch (a 20-bar window must be <= 25% flat), keeping the stray bar
+    assert df['date'][79] <= bad_until < df['date'][99]
+    assert trimmed['date'].iloc[0] > df['date'][79]
+    assert df['date'][150] in set(trimmed['date'])
+    assert trim_flat_history(bars(np.linspace(100, 110, 50)))[1] is None
