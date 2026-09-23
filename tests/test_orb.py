@@ -94,3 +94,7 @@ def test_run_sizes_at_one_percent_and_charges_costs():
     expected = (119.75 - 110.5) * 13 * 5 - 2 * 13 * orb.cfg.COMMISSION_PER_CONTRACT
     assert t['pnl'] == pytest.approx(expected)
     assert curve['equity'].iloc[-1] == pytest.approx(orb.START_EQUITY + expected)
+
+
+def test_quarterly_months():
+    assert orb.quarterly_months(dt.date(2024, 8, 1), dt.date(2025, 6, 30)) == ['202409', '202412', '202503', '202506']

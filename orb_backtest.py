@@ -192,6 +192,16 @@ def summarize(name, trades, curve):
 # Data
 # ---------------------------------------------------------------------------
 
+def quarterly_months(first, last):
+    """'YYYYMM' strings for every Mar/Jun/Sep/Dec between two dates."""
+    months, year, month = [], first.year, first.month
+    while (year, month) <= (last.year, last.month):
+        if month in (3, 6, 9, 12):
+            months.append(f"{year}{month:02d}")
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return months
+
+
 def download(years, pacing_seconds=10):
     """
     Stitches 15-minute bars from each quarterly contract while it was the front
@@ -207,10 +217,16 @@ def download(years, pacing_seconds=10):
     try:
         for key in MARKETS:
             m = cfg.MARKETS_BY_KEY[key]
-            details = ib.reqContractDetails(Contract(secType='FUT', symbol=m.symbol, exchange=m.exchange,
-                                                     currency='USD', includeExpired=True))
+            # IBKR's contract list only includes recently expired contracts, so also
+            # ask for each quarterly month (Mar/Jun/Sep/Dec) individually.
+            query = dict(secType='FUT', symbol=m.symbol, exchange=m.exchange, currency='USD',
+                         includeExpired=True)
+            details = ib.reqContractDetails(Contract(**query))
+            for month in quarterly_months(start - dt.timedelta(days=100), now + dt.timedelta(days=200)):
+                details += ib.reqContractDetails(Contract(**query, lastTradeDateOrContractMonth=month))
             contracts = sorted({d.contract.conId: d.contract for d in details}.values(),
                                key=lambda c: c.lastTradeDateOrContractMonth)
+            print(f"  {key}: contracts found: {', '.join(c.localSymbol for c in contracts)}")
             expiry = lambda c: dt.datetime.strptime(c.lastTradeDateOrContractMonth[:8], '%Y%m%d').replace(
                 tzinfo=dt.timezone.utc)
             rows = []
