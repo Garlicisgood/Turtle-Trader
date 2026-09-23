@@ -1,0 +1,4 @@
+ib_async
+pandas
+tzdata   # time zone data - Windows does not ship it
+pytest

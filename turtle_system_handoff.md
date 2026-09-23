@@ -55,33 +55,51 @@ these caused silent failures during testing and took real debugging to track dow
 - Paper trading account connection confirmed working
 
 ## Current Code Status
-Two scripts exist so far (both tested working):
+Steps 1-5 of the original plan are built. Nothing has been run against TWS yet: the
+new code is tested only offline (`python -m pytest`, 23 tests, including a simulated
+IBKR for the order flow).
 
-1. **test_connection.py** - Minimal connection test. Confirms TWS connection,
-   pulls account summary, confirms market data flows through the API.
+| File | Status |
+|---|---|
+| `test_connection.py` | Original, tested working against TWS |
+| `turtle_signals.py` | Original read-only scanner, tested working against TWS. Kept as-is. |
+| `turtle_config.py` | All parameters and the market list (with the symbol quirks above) |
+| `turtle_core.py` | Rules as pure functions: N, channels, sizing, pyramiding, shared stop, heat limits, and `plan_actions()`, the daily decision used by both the trader and the backtest |
+| `turtle_state.py` | Persists open positions to `turtle_state.json` (atomic write + `.bak`) |
+| `turtle_trader.py` | Daily runner: reconcile with IBKR -> exits -> pyramid adds -> entries. `--dry-run` flag. |
+| `turtle_backtest.py` | Portfolio backtest using the same `plan_actions()`, with history from the full-size contracts |
 
-2. **turtle_signals.py** - Pulls ~250 days of daily history for all 14 markets,
-   calculates N, checks for 100-day entry / 50-day exit breakout signals, prints
-   a summary. Handles the Silver and Natural Gas symbol quirks above. Falls back
-   to finding the nearest dated contract via `reqContractDetails` when a
-   continuous contract (`ContFuture`) isn't available for a given market.
+### Decisions made while building (revisit if wanted)
+- **Sizing:** 1% of equity lost if price reaches the 2N stop:
+  `contracts = floor(equity * 1% / (2 * N * point_value))`. The original Turtles used
+  1% per **1N**, which is twice the size. It's one setting (`SIZING_N`) in the config.
+  At $15-50k many markets size to **0 contracts**. They are skipped and logged, never
+  rounded up.
+- **Signals on daily closes** (as in `turtle_signals.py`). Orders are market orders sent
+  in the evening Globex session. The backtest fills them at the next day's open.
+- **N is fixed at entry** for the whole position: 0.5N pyramid spacing, the 2N stop, and
+  sizing for the added units. The shared stop moves to 2N from the newest fill, only
+  ever tightens, and exists as one GTC stop order at IBKR (`outsideRth=True`).
+- **Pyramiding:** at most one added unit per day.
+- **Heat limits (classic):** 4 units per market, 6 per correlated group, 12 per
+  direction. Groups: equity_index (MES/MNQ/M2K/MYM), precious (MGC/SIL), copper,
+  energy (MCL/MHNG), grains (MZC/MZW), soy (MZS/MZM/MZL).
+- **Safety:** refuses a non-paper account without `--live-account`, leaves alone any
+  market where IBKR's position disagrees with saved state, and blocks a market whose
+  IBKR multiplier disagrees with the config's point value.
 
-**This script only detects and prints signals - it does not yet:**
-- Size positions (the 1% risk / N-based sizing)
-- Place any orders
-- Track open positions or manage pyramiding
-- Manage the shared trailing stop
-
-## Next Steps (not yet built)
-1. Position sizing: given account equity, N, and contract point value, calculate
-   how many contracts = 1% risk per unit
-2. Order placement: fully automated (`transmit=True`), initial stop at 2N
-3. Pyramiding logic: track open positions, add units at 0.5N intervals up to 4,
-   move the shared stop as units are added
-4. Position/state tracking between runs (this needs to run daily, not just once -
-   requires persisting what positions are open, entry prices, current stop level)
-5. Backtest against historical data before going live
-6. Extended paper trading before moving to the funded account
+## Next Steps
+1. First `--dry-run` against TWS. Confirm no point-value mismatches (the micro grains'
+   quote units weren't verified: expected $5/cent for MZC/MZW/MZS, $10 per $1 for MZM,
+   $60/cent for MZL) and that the contract resolution works for all 14 markets.
+2. Run `turtle_backtest.py --download` and review the results, especially how many
+   signals are skipped because they're too small to size at the actual account size.
+3. **Contract rolls are not automated.** The trader warns "ROLL NEEDED" 10 days
+   before a held contract expires and won't pyramid into an old contract, but the
+   roll itself (close old, open new, move the stop) is still manual. This must be
+   automated before the system can run unattended for months.
+4. Schedule it (Windows Task Scheduler, Sun-Thu ~8:30-10pm ET) and paper trade.
+5. Extended paper trading before moving to the funded account.
 
 ## Important Context
 - Account size: $15k-$50k paper trading (funded account will match this range)
