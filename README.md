@@ -12,6 +12,7 @@ Interactive Brokers. Full rules and background: [turtle_system_handoff.md](turtl
 | `turtle_trader.py` | **The daily runner.** Places real orders on your paper account. |
 | `turtle_state.py` | Saves open positions to `turtle_state.json` between runs |
 | `turtle_backtest.py` | Replays history through the same rules |
+| `yahoo_download.py` | Free 20+ year daily history from Yahoo into `data_yahoo/`, with a roll-jump / bad-bar report. Backtest it with `python turtle_backtest.py --data data_yahoo`. Not roll-adjusted: rough first look only. |
 | `turtle_signals.py` | The original signal scanner (read-only, still works on its own) |
 | `test_connection.py` | Checks the TWS connection |
 | `orb_backtest.py` | **Second strategy:** 15-minute opening range breakout backtest (MES/MNQ/MYM) |
