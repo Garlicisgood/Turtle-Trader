@@ -157,6 +157,13 @@ sets long/short; entry at the 9:35 open; stop at the other end of the candle; 1%
 paper (10R target or close), hold to close, 2R, 1R trailing, add at +1R with stop to entry.
 Same markets (MES/MNQ/MYM), same worst-case assumptions and costs as the ORB.
 
+## First-candle results (2026-09-24, IBKR 5-min data Dec 2025 - Sep 2026)
+All 5 exits lost money. Paper rules (10R or close): -32%, max DD -60%, 26% winners, avg R -0.06,
+$11.2k in commissions (still negative before commissions). The 1R trailing stop was the least bad
+(-8%, DD -26%). MYM lost the most (-$16.9k); MNQ, the closest match to the paper's QQQ, lost -$2.6k.
+The 3 markets traded the same direction 43% of the time. Not pursued. Three intraday ideas tested,
+none with an edge in this period.
+
 ## Important Context
 - Account size: target $75k (paper sizes as $75k; the funded account will match)
 - User has some coding experience (self-described as "not very experienced but
