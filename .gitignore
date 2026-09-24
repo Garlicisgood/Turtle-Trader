@@ -9,3 +9,5 @@ data/
 backtest_results/
 data_15m/
 orb_results/
+data_5m/
+first_candle_results/

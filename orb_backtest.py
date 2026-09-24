@@ -202,16 +202,17 @@ def quarterly_months(first, last):
     return months
 
 
-def download(years, pacing_seconds=10):
+def download(years, bar_size='15 mins', data_dir=DATA_DIR, chunks=('1 M',), pacing_seconds=10):
     """
-    Stitches 15-minute bars from each quarterly contract while it was the front
+    Stitches intraday bars from each quarterly contract while it was the front
     month. (Day trades are flat every night, so no back-adjustment is needed.)
-    IBKR keeps expired-contract data for about 2 years.
+    chunks: request lengths to try, largest first - if IBKR returns nothing for
+    one, the next smaller one is tried.
     """
     from ib_async import IB, Contract
     ib = IB()
     ib.connect(host=cfg.IB_HOST, port=cfg.IB_PORT, clientId=cfg.IB_CLIENT_ID + 20, timeout=10)
-    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(data_dir, exist_ok=True)
     now = dt.datetime.now(dt.timezone.utc)
     start = now - dt.timedelta(days=365 * years)
     try:
@@ -236,12 +237,16 @@ def download(years, pacing_seconds=10):
                 if front_end <= start or front_start >= now:
                     continue
                 print(f"  {key}: {cur.localSymbol} {front_start.date()} to {front_end.date()}")
-                end = front_end
+                end, chunk = front_end, 0
                 while end > max(front_start, start):
-                    bars = ib.reqHistoricalData(cur, endDateTime=end, durationStr='1 M',
-                                                barSizeSetting='15 mins', whatToShow='TRADES',
+                    bars = ib.reqHistoricalData(cur, endDateTime=end, durationStr=chunks[chunk],
+                                                barSizeSetting=bar_size, whatToShow='TRADES',
                                                 useRTH=True, formatDate=2)
                     ib.sleep(pacing_seconds)
+                    if not bars and chunk + 1 < len(chunks):
+                        chunk += 1
+                        print(f"    no data for a {chunks[chunk - 1]} request - trying {chunks[chunk]}")
+                        continue
                     if not bars or bars[0].date >= end:
                         break
                     rows += [{'datetime': b.date, 'open': b.open, 'high': b.high, 'low': b.low,
@@ -254,17 +259,17 @@ def download(years, pacing_seconds=10):
             df = pd.DataFrame(rows).drop_duplicates('datetime').sort_values('datetime')
             df['datetime'] = pd.to_datetime(df['datetime'], utc=True).dt.tz_convert('America/New_York')
             df['datetime'] = df['datetime'].dt.tz_localize(None)
-            path = os.path.join(DATA_DIR, f"{key}.csv")
+            path = os.path.join(data_dir, f"{key}.csv")
             df.to_csv(path, index=False)
             print(f"  {key}: {len(df)} bars, {df['datetime'].iloc[0]} to {df['datetime'].iloc[-1]} -> {path}")
     finally:
         ib.disconnect()
 
 
-def load(keys):
+def load(keys, data_dir=DATA_DIR):
     frames = {}
     for key in keys:
-        path = os.path.join(DATA_DIR, f"{key}.csv")
+        path = os.path.join(data_dir, f"{key}.csv")
         if not os.path.exists(path):
             print(f"  {key}: no {path}, leaving it out.")
             continue

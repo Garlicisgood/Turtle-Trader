@@ -145,6 +145,18 @@ IBKR for the order flow).
 - Next: user runs `--download`, then the comparison; pick a rule; build a live ORB trader
   (separate client ID) if the results hold up.
 
+## ORB results (2026-09-24, IBKR 15-min data Dec 2025 - Sep 2026)
+IBKR only serves micro index contracts back to Z5, so there are ~9 months of data. All 10 variants lost
+(-12% to -28%, max DD 19-47%). Average R was about 0.00 per trade before commissions, so there's no
+edge and costs make it a loss. MES/MNQ/MYM traded the same direction 70% of the time. Not pursued.
+
+## Third Strategy: First 5-Minute Candle (started 2026-09-24)
+`first_candle_backtest.py`, following Zarattini & Aziz (2023). The 9:30-9:35 candle direction
+sets long/short; entry at the 9:35 open; stop at the other end of the candle; 1% risk with a
+4x leverage cap (the cap often binds on MES, so those trades risk less than 1%). Exits compared:
+paper (10R target or close), hold to close, 2R, 1R trailing, add at +1R with stop to entry.
+Same markets (MES/MNQ/MYM), same worst-case assumptions and costs as the ORB.
+
 ## Important Context
 - Account size: target $75k (paper sizes as $75k; the funded account will match)
 - User has some coding experience (self-described as "not very experienced but

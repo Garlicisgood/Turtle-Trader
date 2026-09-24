@@ -15,6 +15,7 @@ Interactive Brokers. Full rules and background: [turtle_system_handoff.md](turtl
 | `turtle_signals.py` | The original signal scanner (read-only, still works on its own) |
 | `test_connection.py` | Checks the TWS connection |
 | `orb_backtest.py` | **Second strategy:** 15-minute opening range breakout backtest (MES/MNQ/MYM) |
+| `first_candle_backtest.py` | **Third strategy:** first 5-minute candle direction (Zarattini & Aziz 2023 rules) |
 | `tests/` | Automated tests, no TWS needed: `python -m pytest` |
 
 ## Setup (Windows Command Prompt)
@@ -98,3 +99,14 @@ python orb_backtest.py --download     # ~20 min: IBKR limits how fast history ca
 python orb_backtest.py
 ```
 Settings are at the top of `orb_backtest.py`.
+
+## Third strategy: first 5-minute candle
+
+Follows Zarattini & Aziz (2023). If the 9:30-9:35 candle closes up, buy at 9:35; if it closes down, short.
+The stop goes at the other end of that candle. Risk is 1% per trade with a 4x leverage cap.
+The paper's exit is a 10R target or the close; four other exits are compared alongside it.
+
+```
+python first_candle_backtest.py --download
+python first_candle_backtest.py
+```
