@@ -150,6 +150,9 @@ IBKR only serves micro index contracts back to Z5, so there are ~9 months of dat
 (-12% to -28%, max DD 19-47%). Average R was about 0.00 per trade before commissions, so there's no
 edge and costs make it a loss. MES/MNQ/MYM traded the same direction 70% of the time. Not pursued.
 
+ORB on SPY/QQQ: `orb_backtest.py --etf` runs the same rules on the ETFs (shares, $0.005/share
+min $1, 4x leverage cap), with 5 years of IBKR 15-min history. The report adds win rate and P&L per market.
+
 ## Third Strategy: First 5-Minute Candle (started 2026-09-24)
 `first_candle_backtest.py`, following Zarattini & Aziz (2023). The 9:30-9:35 candle direction
 sets long/short; entry at the 9:35 open; stop at the other end of the candle; 1% risk with a

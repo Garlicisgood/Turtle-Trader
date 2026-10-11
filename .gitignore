@@ -12,3 +12,5 @@ orb_results/
 data_5m/
 first_candle_results/
 data_yahoo/
+data_15m_etf/
+orb_results_etf/

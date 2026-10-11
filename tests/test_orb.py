@@ -98,3 +98,17 @@ def test_run_sizes_at_one_percent_and_charges_costs():
 
 def test_quarterly_months():
     assert orb.quarterly_months(dt.date(2024, 8, 1), dt.date(2025, 6, 30)) == ['202409', '202412', '202503', '202506']
+
+
+def test_etf_sizing_uses_shares_leverage_cap_and_stock_commission():
+    # SPY-like: anchor 600.00-600.50, break to 600.51, close 602
+    d = day(('09:30', 600, 600.4, 599.8, 600.2), ('09:45', 600.2, 600.5, 600.0, 600.3),
+            ('10:00', 600.3, 600.8, 600.2, 600.7), ('15:45', 601.5, 602.1, 601.4, 602))
+    trades, _ = orb.run({'SPY': d}, {'target_r': None, 'trail': False})
+    [t] = trades.to_dict('records')
+    entry = 600.51 + 0.01
+    # 1% risk would allow 750 / 0.53 = 1415 shares; 4x leverage allows 300,000 / 600.52 = 499
+    assert t['qty'] == int(75_000 * 4 // entry)
+    assert t['risk_pct'] < 0.01
+    fee = max(t['qty'] * 0.005, 1.0)
+    assert t['pnl'] == pytest.approx((602 - 0.01 - entry) * t['qty'] - 2 * fee)

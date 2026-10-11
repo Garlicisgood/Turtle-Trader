@@ -101,6 +101,14 @@ python orb_backtest.py
 ```
 Settings are at the top of `orb_backtest.py`.
 
+**Same test on SPY and QQQ** (stock ETFs; IBKR keeps years of 15-minute history for these,
+against only ~9 months for the futures). Sized in shares, $0.005/share commission ($1 minimum),
+capped at 4x intraday leverage:
+```
+python orb_backtest.py --etf --download     # 5 years, roughly 20 minutes
+python orb_backtest.py --etf
+```
+
 ## Third strategy: first 5-minute candle
 
 Follows Zarattini & Aziz (2023). If the 9:30-9:35 candle closes up, buy at 9:35; if it closes down, short.

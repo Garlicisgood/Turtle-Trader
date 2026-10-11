@@ -33,6 +33,7 @@ import os
 import sys
 
 import pandas as pd
+from dataclasses import dataclass
 
 import turtle_config as cfg
 
@@ -53,6 +54,36 @@ ENTRY_WINDOWS = {                    # start time of the LAST candle allowed to 
     '3rd candle only': dt.time(10, 0),
     'Until noon':      dt.time(11, 45),
 }
+
+# --- Stock ETFs (python orb_backtest.py --etf) ------------------------------
+ETFS = {'SPY': 'ARCA', 'QQQ': 'NASDAQ'}   # symbol -> primary exchange
+ETF_DATA_DIR = 'data_15m_etf'
+ETF_RESULTS_DIR = 'orb_results_etf'
+ETF_COMMISSION_PER_SHARE = 0.005        # IBKR fixed pricing, approx.
+ETF_MIN_COMMISSION = 1.00               # per order
+ETF_MAX_LEVERAGE = 4.0                  # standard intraday buying power for stocks
+
+
+@dataclass(frozen=True)
+class Instrument:
+    tick: float
+    point_value: float          # $ per 1.0 price move per contract/share
+    per_unit_fee: float         # commission per contract/share, per side
+    min_fee: float = 0.0        # minimum commission per order
+    max_leverage: float | None = None
+
+
+def instrument(key):
+    if key in ETFS:
+        return Instrument(0.01, 1.0, ETF_COMMISSION_PER_SHARE, ETF_MIN_COMMISSION, ETF_MAX_LEVERAGE)
+    m = cfg.MARKETS_BY_KEY[key]
+    return Instrument(m.tick, m.point_value, cfg.COMMISSION_PER_CONTRACT)
+
+
+def commission(inst, qty):
+    """One side (entry or exit) of a trade."""
+    return max(qty * inst.per_unit_fee, inst.min_fee)
+
 
 EXIT_RULES = {
     'Hold to close':      {'target_r': None, 'trail': False},
@@ -148,7 +179,7 @@ def run(frames, rule, equity=START_EQUITY):
     for date in sorted(days):
         start_equity = equity               # all markets sized off the morning's equity
         for key, day in sorted(days[date].items()):
-            m = cfg.MARKETS_BY_KEY[key]
+            m = instrument(key)
             t = simulate_day(day, m.tick, **rule)
             if t is None:
                 continue
@@ -159,14 +190,17 @@ def run(frames, rule, equity=START_EQUITY):
             exit_ = t['exit'] - d * exit_slip
             risk_points = abs(entry - t['stop']) + slip
             qty = math.floor(start_equity * RISK_PER_TRADE / (risk_points * m.point_value))
+            if m.max_leverage:
+                qty = min(qty, math.floor(start_equity * m.max_leverage / (entry * m.point_value)))
             if qty < 1:
                 continue
-            pnl = (exit_ - entry) * d * qty * m.point_value - 2 * qty * cfg.COMMISSION_PER_CONTRACT
+            pnl = (exit_ - entry) * d * qty * m.point_value - 2 * commission(m, qty)
             equity += pnl
             trades.append({'date': date, 'time': t['entry_time'], 'key': key,
                            'direction': 'long' if d > 0 else 'short',
                            'qty': qty, 'entry': entry, 'exit': exit_, 'reason': t['reason'],
-                           'r': (exit_ - entry) * d / risk_points, 'pnl': round(pnl, 2)})
+                           'r': (exit_ - entry) * d / risk_points, 'pnl': round(pnl, 2),
+                           'risk_pct': qty * risk_points * m.point_value / start_equity})
         curve.append({'date': date, 'equity': equity})
     return pd.DataFrame(trades), pd.DataFrame(curve)
 
@@ -266,6 +300,42 @@ def download(years, bar_size='15 mins', data_dir=DATA_DIR, chunks=('1 M',), paci
         ib.disconnect()
 
 
+def download_etfs(years, bar_size='15 mins', data_dir=ETF_DATA_DIR, pacing_seconds=10):
+    """15-minute regular-hours bars for SPY and QQQ, a month per request, newest first."""
+    from ib_async import IB, Stock
+    ib = IB()
+    ib.connect(host=cfg.IB_HOST, port=cfg.IB_PORT, clientId=cfg.IB_CLIENT_ID + 20, timeout=10)
+    os.makedirs(data_dir, exist_ok=True)
+    now = dt.datetime.now(dt.timezone.utc)
+    start = now - dt.timedelta(days=365 * years)
+    try:
+        for sym, primary in ETFS.items():
+            [contract] = ib.qualifyContracts(Stock(sym, 'SMART', 'USD', primaryExchange=primary))
+            rows, end = [], now
+            while end > start:
+                bars = ib.reqHistoricalData(contract, endDateTime=end, durationStr='1 M',
+                                            barSizeSetting=bar_size, whatToShow='TRADES',
+                                            useRTH=True, formatDate=2)
+                ib.sleep(pacing_seconds)
+                if not bars or bars[0].date >= end:
+                    break
+                rows += [{'datetime': b.date, 'open': b.open, 'high': b.high, 'low': b.low,
+                          'close': b.close} for b in bars if b.date > start]
+                end = bars[0].date
+                print(f"  {sym}: back to {end.date()}")
+            if not rows:
+                print(f"  {sym}: no data returned.")
+                continue
+            df = pd.DataFrame(rows).drop_duplicates('datetime').sort_values('datetime')
+            df['datetime'] = pd.to_datetime(df['datetime'], utc=True).dt.tz_convert('America/New_York')
+            df['datetime'] = df['datetime'].dt.tz_localize(None)
+            path = os.path.join(data_dir, f"{sym}.csv")
+            df.to_csv(path, index=False)
+            print(f"  {sym}: {len(df)} bars, {df['datetime'].iloc[0]} to {df['datetime'].iloc[-1]} -> {path}")
+    finally:
+        ib.disconnect()
+
+
 def load(keys, data_dir=DATA_DIR):
     frames = {}
     for key in keys:
@@ -316,6 +386,24 @@ def report(frames):
               f"the same direction {same:.0%} of the time; {both} both-sides candles counted as losses.")
         print(f"  Hold-to-close P&L by market: {pnl}")
 
+    # Win rate and average risk actually taken, per market
+    by_market = {}
+    for name, trades in results.items():
+        if trades.empty:
+            continue
+        g = trades.groupby('key')
+        row = {f"{k} win %": v for k, v in g['pnl'].apply(lambda p: (p > 0).mean()).items()}
+        row.update({f"{k} P&L": v for k, v in g['pnl'].sum().items()})
+        by_market[name] = row
+    if by_market:
+        table = pd.DataFrame(by_market).T
+        fmt = {c: ('{:.0%}'.format if 'win' in c else '${:,.0f}'.format) for c in table.columns}
+        print("\nBy market:")
+        print(table.to_string(formatters=fmt))
+        risk = pd.concat(results.values())['risk_pct']
+        print(f"\nAverage risk actually taken per trade: {risk.mean():.2%} of equity "
+              f"(below {RISK_PER_TRADE:.0%} when the leverage cap limits the size)")
+
     os.makedirs(RESULTS_DIR, exist_ok=True)
     for name, trades in results.items():
         fname = name.replace(' | ', '__').replace(' ', '_')
@@ -326,14 +414,25 @@ def report(frames):
 def main():
     parser = argparse.ArgumentParser(description="15-minute opening range breakout backtest")
     parser.add_argument('--download', action='store_true', help="pull 15-minute history from TWS")
-    parser.add_argument('--years', type=int, default=2, help="years to download (IBKR keeps ~2)")
+    parser.add_argument('--years', type=int, help="years to download (default 2 futures, 5 ETFs)")
+    parser.add_argument('--etf', action='store_true', help="test SPY and QQQ instead of the futures")
     args = parser.parse_args()
-    if args.download:
-        download(args.years)
-        return
-    frames = load(MARKETS)
+    global RESULTS_DIR
+    if args.etf:
+        RESULTS_DIR = ETF_RESULTS_DIR
+        if args.download:
+            download_etfs(args.years or 5)
+            return
+        frames = load(list(ETFS), data_dir=ETF_DATA_DIR)
+        data_dir = ETF_DATA_DIR
+    else:
+        if args.download:
+            download(args.years or 2)
+            return
+        frames = load(MARKETS)
+        data_dir = DATA_DIR
     if not frames:
-        sys.exit(f"No data in {DATA_DIR}/ - run with --download first.")
+        sys.exit(f"No data in {data_dir}/ - run with --download first.")
     report(frames)
 
 
