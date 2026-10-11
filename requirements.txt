@@ -2,3 +2,4 @@ ib_async
 pandas
 tzdata   # time zone data - Windows does not ship it
 pytest
+yfinance   # free daily history for backtesting (turtle_download_yahoo.py)

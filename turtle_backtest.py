@@ -72,10 +72,10 @@ def download(years):
         ib.disconnect()
 
 
-def load_data(keys):
+def load_data(keys, data_dir=DATA_DIR):
     frames = {}
     for key in keys:
-        path = os.path.join(DATA_DIR, f"{key}.csv")
+        path = os.path.join(data_dir, f"{key}.csv")
         if not os.path.exists(path):
             print(f"  {key}: no {path}, leaving it out.")
             continue
@@ -248,6 +248,8 @@ def main():
                         help="starting account equity (default: PAPER_STARTING_EQUITY)")
     parser.add_argument('--start', type=pd.Timestamp, help="first date to trade (YYYY-MM-DD)")
     parser.add_argument('--end', type=pd.Timestamp, help="last date to trade (YYYY-MM-DD)")
+    parser.add_argument('--data-dir', default=DATA_DIR,
+                        help="folder of <KEY>.csv files (e.g. data_yahoo)")
     parser.add_argument('--markets', help="comma-separated keys to include, e.g. MES,MGC (default: all)")
     args = parser.parse_args()
 
@@ -259,9 +261,9 @@ def main():
     unknown = [k for k in keys if k not in cfg.MARKETS_BY_KEY]
     if unknown:
         sys.exit(f"Unknown market keys: {unknown}")
-    frames = load_data(keys)
+    frames = load_data(keys, args.data_dir)
     if not frames:
-        sys.exit(f"No data found in {DATA_DIR}/ - run with --download first.")
+        sys.exit(f"No data found in {args.data_dir}/ - run with --download first.")
     report(Backtest(frames, args.equity, args.start, args.end).run(), args.equity)
 
 
